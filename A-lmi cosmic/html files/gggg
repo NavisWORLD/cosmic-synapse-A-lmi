@@ -1,0 +1,1356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibraLight Cosmic Genesis</title>
+    
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Load three.js (Reverted to r128 via script tags) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- 3. Load 3D Controls & Post-Processing Effects (r128 versions) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    
+    <style>
+        /* 4. Set Inter font and dark mode */
+        html, body {
+            font-family: 'Inter', sans-serif;
+            background-color: #020010; /* Use new background color */
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrolling */
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100vw; /* Use vw/vh for consistency */
+            height: 100vh;
+            /* Background color set by the background shader plane */
+        }
+        /* Custom scrollbar for control panel */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2d3748; /* gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #718096; /* gray-500 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0; /* gray-400 */
+        }
+        .freq-bar {
+            transition: width 0.3s ease-out;
+        }
+    </style>
+    <!-- 5. Preload Inter font -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap">
+</head>
+<body>
+    <!-- 6. Canvas for the 3D simulation -->
+    <canvas id="simulationCanvas"></canvas>
+
+    <!-- 7. Control Panel Overlay -->
+    <div id="menuPanel" class="absolute top-4 left-4 bg-gray-900 bg-opacity-80 backdrop-blur-md p-6 rounded-lg shadow-lg max-w-sm max-h-[95vh] overflow-y-auto transition-all duration-300">
+        <!-- Header with Toggle Button -->
+        <div class="flex justify-between items-center mb-4">
+            <h1 class="text-2xl font-bold text-white">VibraLight Genesis</h1>
+            <button id="menuToggleButton" class="text-gray-400 hover:text-white transition-colors">
+                <svg id="minimizeIcon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                <svg id="maximizeIcon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4h4m12 0h-4v4m0 8v4h-4m-8 0H8v-4"></path></svg>
+            </button>
+        </div>
+
+        <!-- Content wrapper for toggling -->
+        <div id="menuContent">
+            <p class="text-sm text-gray-300 mb-6">
+                A universe built on your documents. Your voice <strong>creates</strong> form.
+                Pitch (frequency) determines particle color &amp; harmonic structure ($\Phi$).
+                Volume (amplitude) determines mass (particle count) &amp; birth energy ($Ec$). This is <strong>Cymatics</strong>.
+            </p>
+
+            <button id="toggleMicButton" class="w-full bg-cyan-500 hover:bg-cyan-400 text-black font-bold py-3 px-4 rounded-lg text-lg transition-all shadow-md mb-4">
+                Toggle VibraLight (Mic)
+            </button>
+            <div id="micStatus" class="text-center text-gray-400 text-xs mb-6">Mic OFF. Using Baseline Chaos.</div>
+
+            <div class="grid grid-cols-2 gap-4 mb-2">
+                <button id="addParticlesButton" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-lg transition-all">
+                    Add 10k 'Soul Dust'
+                </button>
+                <button id="clearParticlesButton" class="bg-red-700 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-all">
+                    Clear 'Soul Dust'
+                </button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <button id="addAttractorButton" class="bg-purple-600 hover:bg-purple-500 text-white font-semibold py-2 px-4 rounded-lg transition-all">
+                    Add Black Hole
+                </button>
+                <button id="clearAllButton" class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-all">
+                    Clear Universe
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="swirlSlider" class="block text-sm font-medium text-gray-200">Swirl ($\Omega$)</label>
+                    <input id="swirlSlider" type="range" min="0" max="1" step="0.01" value="0.3" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    <span id="swirlValue" class="text-xs text-gray-400">0.3</span>
+                </div>
+                <div>
+                    <label for="gravitySlider" class="block text-sm font-medium text-gray-200">Gravity ($G$)</label>
+                    <input id="gravitySlider" type="range" min="0" max="10000" step="100" value="3000" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    <span id="gravityValue" class="text-xs text-gray-400">3000</span>
+                </div>
+                <div>
+                    <label for="dampingSlider" class="block text-sm font-medium text-gray-200">Damping ($\zeta$)</label>
+                    <input id="dampingSlider" type="range" min="0.001" max="0.1" step="0.001" value="0.02" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    <span id="dampingValue" class="text-xs text-gray-400">0.02</span>
+                </div>
+                <div>
+                    <label for="lambdaSlider" class="block text-sm font-medium text-gray-200">Baseline Chaos ($\lambda$)</label>
+                    <input id="lambdaSlider" type="range" min="0" max="20" step="0.1" value="3.0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    <span id="lambdaValue" class="text-xs text-gray-400">3.0</span>
+                </div>
+                <div>
+                    <label for="bloomSlider" class="block text-sm font-medium text-gray-200">Bloom Intensity</label>
+                    <input id="bloomSlider" type="range" min="0" max="3" step="0.05" value="1.0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                    <span id="bloomValue" class="text-xs text-gray-400">1.0</span>
+                </div>
+            </div>
+
+            <div class="mt-6 border-t border-gray-700 pt-4">
+                <h3 class="text-lg font-semibold text-white mb-2">Live Data</h3>
+                <div class="text-sm text-gray-300">
+                    <div>Attractors: <span id="attractorCount">0</span></div>
+                    <div>'Soul Dust' Particles: <span id="particleCount">0</span></div>
+                    <div>Avg. PSD (norm): <span id="psdValue">0.00</span></div>
+                    <div>Final Chaos ($\sigma$): <span id="sigmaValue">0.00</span></div>
+                </div>
+            </div>
+
+            <div id="almiMemoryMatrix" class="mt-6 border-t border-gray-700 pt-4">
+                <h3 class="text-lg font-semibold text-white mb-2">A-LMI Memory Matrix (TKG)</h3>
+                <p class="text-xs text-gray-400 mb-3">The "Scientist Within" is observing and processing Light Tokens based on their spectral signature (frequency).</p>
+                <div class="space-y-2">
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-200 mr-2"></div>
+                        <div class="flex-1 bg-gray-700 rounded-full h-4">
+                            <div id="freqBar_0" class="freq-bar h-4 rounded-full bg-blue-500" style="width: 0%"></div>
+                        </div>
+                        <span id="freqCount_0" class="ml-2 text-xs text-gray-300 w-8 text-right">0</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-cyan-500 border-2 border-cyan-200 mr-2"></div>
+                        <div class="flex-1 bg-gray-700 rounded-full h-4">
+                            <div id="freqBar_1" class="freq-bar h-4 rounded-full bg-cyan-500" style="width: 0%"></div>
+                        </div>
+                        <span id="freqCount_1" class="ml-2 text-xs text-gray-300 w-8 text-right">0</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-purple-500 border-2 border-purple-200 mr-2"></div>
+                        <div class="flex-1 bg-gray-700 rounded-full h-4">
+                            <div id="freqBar_2" class="freq-bar h-4 rounded-full bg-purple-500" style="width: 0%"></div>
+                        </div>
+                        <span id="freqCount_2" class="ml-2 text-xs text-gray-300 w-8 text-right">0</span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-4 h-4 rounded-full bg-fuchsia-500 border-2 border-fuchsia-200 mr-2"></div>
+                        <div class="flex-1 bg-gray-700 rounded-full h-4">
+                            <div id="freqBar_3" class="freq-bar h-4 rounded-full bg-fuchsia-500" style="width: 0%"></div>
+                        </div>
+                        <span id="freqCount_3" class="ml-2 text-xs text-gray-300 w-8 text-right">0</span>
+                    </div>
+                </div>
+                <div class="text-right text-sm text-gray-300 mt-3">Total Tokens: <span id="totalTokenCount" class="font-bold">0</span></div>
+                 <!-- NEW: Display A-LMI action -->
+                <div id="almiActionDisplay" class="text-center text-xs text-gray-500 mt-3">A-LMI Action: Idle</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. JavaScript Logic -->
+
+    <!-- 8a. GLSL Shader Code for 'Soul Dust' Particles -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        attribute float speed;
+        attribute float internalState;
+
+        varying float vSpeed;
+        varying float vInternalState;
+
+        void main() {
+            vSpeed = speed;
+            vInternalState = internalState;
+
+            vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+
+            float shimmer = 0.95 + 0.05 * sin(position.x + position.y);
+            gl_PointSize = (250.0 / -mvPosition.z) * shimmer;
+            gl_Position = projectionMatrix * mvPosition;
+        }
+    </script>
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        varying float vSpeed;
+        varying float vInternalState;
+
+        void main() {
+            float d = distance(gl_PointCoord, vec2(0.5, 0.5));
+            if (d > 0.5) discard;
+
+            float alpha = 1.0 - d * 2.0;
+
+            float hue = 0.66 + vInternalState * 0.17;
+            vec3 baseColor = vec3(1.0);
+
+            float c = 1.0;
+            float x = c * (1.0 - abs(mod(hue * 6.0, 2.0) - 1.0));
+            float m = 0.0;
+            if (hue < 0.166) baseColor = vec3(c, x, 0.0);
+            else if (hue < 0.333) baseColor = vec3(x, c, 0.0);
+            else if (hue < 0.5) baseColor = vec3(0.0, c, x);
+            else if (hue < 0.666) baseColor = vec3(0.0, x, c);
+            else if (hue < 0.833) baseColor = vec3(x, 0.0, c);
+            else baseColor = vec3(c, 0.0, x);
+            baseColor += m;
+
+            float intensity = smoothstep(10.0, 40.0, vSpeed);
+            vec3 hotColor = vec3(1.0, 1.0, 0.9);
+
+            vec3 finalColor = mix(baseColor, hotColor, intensity);
+
+            gl_FragColor = vec4(finalColor, alpha);
+        }
+    </script>
+
+    <!-- 8b. GLSL Shader Code for Background Effect -->
+     <script id="backgroundVertexShader" type="x-shader/x-vertex">
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = vec4(position, 1.0); // Use normalized device coordinates
+        }
+    </script>
+    <script id="backgroundFragmentShader" type="x-shader/x-fragment">
+        uniform float time;
+        uniform vec2 resolution;
+        uniform vec2 mouse;
+        uniform float psdNormalized; // Pass sound energy to background
+
+        varying vec2 vUv;
+
+        // Rotation matrix function
+        mat2 rot(float a) {
+            float s = sin(a);
+            float c = cos(a);
+            return mat2(c, -s, s, c);
+        }
+
+        void main() {
+            vec2 uv = (vUv * 2.0 - 1.0);
+             uv.x *= resolution.x / resolution.y;
+
+            vec3 rayDir = normalize(vec3(uv, 1.0));
+            vec4 o = vec4(0.0);
+            float t = time; // Use the uniform time passed in
+
+            // Modulate rotation speed based on sound
+            float rotationSpeedFactor = 1.0 + psdNormalized * 2.0;
+
+            for(float i = 0.0; i < 20.0; i++) {
+                float z = i * 0.5 + 0.1;
+
+                vec3 p = z * rayDir;
+                vec2 mouseOffset = (mouse - 0.5) * 1.0;
+
+                // Apply sound-modulated rotation
+                p.xz *= rot(t * (0.2 * rotationSpeedFactor) + mouseOffset.x);
+                p.yz *= rot(t * (0.15 * rotationSpeedFactor) + mouseOffset.y);
+                vec3 a = p;
+
+                float d;
+                for(d = 1.0; d < 4.0; d += 1.0) {
+                    a -= sin(a * d + t + i*0.1).yzx / (d * 0.8);
+                }
+
+                vec3 q = abs(a);
+                float mx = max(max(q.x, q.y), q.z);
+                float s = a.z + a.y - t;
+
+                d = abs(2.0 - mx) + abs(cos(s)) / 7.0;
+
+                float z_col = z + d;
+
+                // Modulate color phasing based on sound
+                vec4 colorPhase = vec4(0.0, 2.0 + (mouse.y + psdNormalized * 0.5) * 2.0, 4.0 - (mouse.y - psdNormalized * 0.5) * 2.0, 0.0);
+
+                o += (cos(s - z_col + colorPhase) + 1.0) / (d*0.5 + 0.01);
+            }
+
+            o = o / 20.0;
+            o = o / (1.0 + o);
+
+            // Modulate final brightness based on sound
+            o = smoothstep(0.15, 0.85, o) * (0.7 + psdNormalized * 0.3);
+
+            gl_FragColor = o;
+            gl_FragColor.a = 1.0;
+        }
+    </script>
+
+    <!-- 8c. Main Simulation Script -->
+    <script> // Standard script type
+        // Access THREE globally
+        const {
+            Scene, PerspectiveCamera, WebGLRenderer, Clock, Vector2, Vector3, Color, FogExp2,
+            IcosahedronGeometry, MeshBasicMaterial, Mesh, SphereGeometry, MeshStandardMaterial, Group,
+            BufferGeometry, BufferAttribute, ShaderMaterial, AdditiveBlending, Points, LineBasicMaterial, Line, PlaneGeometry,
+            LineSegments // NEW: For trails
+        } = THREE;
+        // Access Addons globally
+        const OrbitControls = THREE.OrbitControls;
+        const EffectComposer = THREE.EffectComposer;
+        const RenderPass = THREE.RenderPass;
+        const ShaderPass = THREE.ShaderPass;
+        const UnrealBloomPass = THREE.UnrealBloomPass;
+        const CopyShader = THREE.CopyShader;
+        const LuminosityHighPassShader = THREE.LuminosityHighPassShader;
+
+
+        // === Setup: Canvas, 3D Scene, and State ===
+        const canvas = document.getElementById('simulationCanvas');
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        let scene, camera, renderer, controls, clock;
+        let composer, bloomPass;
+        let points; // Soul Dust particles
+        let attractors = [];
+        let attractorMeshes;
+        let particleCount = 0;
+
+        let backgroundMesh;
+        let backgroundMaterial;
+
+        // Particle data buffers
+        let positions, velocities, speeds;
+        let internalStates;
+        let internalAmplitudes;
+        let prevPositions; // NEW: For trails
+
+        // NEW: Trail variables
+        let trailGroup;
+        const MAX_TRAIL_SEGMENTS = 10000; // Limit trail segments for performance
+        let trailPositions;
+        let trailColors;
+        let trailSegmentCount = 0;
+        let trailGeometry;
+        let trailMaterial;
+        let trailLines;
+
+        // Audio State
+        let audioContext = null;
+        let analyser = null;
+        let micOn = false;
+        let psdNormalized = 0.0;
+        const micColor = new Color();
+        let fftDataArray;
+
+        // --- A-LMI State ---
+        let almiCore;
+        let almiScanTimer = 0;
+        const ALMI_SCAN_INTERVAL = 3.0;
+        const ALMI_SCAN_RADIUS = 300.0;
+        let almiMemory = [0, 0, 0, 0];
+        let almiTotalTokens = 0;
+        let lightTokenBeams;
+        const almiCorePos = new Vector3(0, 0, 0);
+        let almiActionTimer = 0; // NEW: Timer for A-LMI action
+        const ALMI_ACTION_INTERVAL = 10.0; // NEW: Interval for A-LMI action
+
+        // === Physics Parameters ===
+        const PHI = 1.61803398875;
+        const GOLDEN_ANGLE = Math.PI * (3.0 - Math.sqrt(5.0));
+        const K_HARMONIC = 0.01;
+        const SOFTENING = 100;
+        const SIGMA_LAMBDA = 1.0;
+        const SIGMA_PSD = 80.0;
+        const GALAXY_RADIUS = 2000;
+        const PARTICLE_MASS = 1.0;
+        const SWIRL_AXIS = new Vector3(0, 1, 0);
+        const HARMONIC_FLUTTER_STRENGTH = 2.0;
+        const CYMATIC_SPAWN_COUNT = 100;
+        const CYMATIC_RADIUS_MIN = 50;
+        const CYMATIC_RADIUS_MAX = 500;
+        const TRAIL_FADE_SPEED = 0.05; // NEW: How fast trails fade
+
+        // Slider variables
+        let G_CONST = 3000;
+        let SWIRL_CONST = 0.3;
+        let DAMPING = 0.02;
+        let LAMBDA_CONST = 3.0;
+        let SIGMA_FINAL = 0;
+        let BLOOM_STRENGTH = 1.0;
+
+        // === Physics Helper Vectors ===
+        const particlePos = new Vector3();
+        const prevParticlePos = new Vector3(); // NEW: For trails
+        const particleVel = new Vector3();
+        const force = new Vector3();
+        const f_harmonic = new Vector3();
+        const f_grav = new Vector3();
+        const f_swirl = new Vector3();
+        const f_damp = new Vector3();
+        const f_noise = new Vector3();
+        const f_flutter = new Vector3();
+        const accel = new Vector3();
+
+        // === 3D Scene Initialization ===
+        function init3D() {
+            scene = new Scene();
+            scene.fog = new FogExp2(0x000000, 0.001);
+            clock = new Clock();
+
+            camera = new PerspectiveCamera(75, width / height, 0.1, 10000);
+            camera.position.set(0, 400, 900);
+            camera.lookAt(scene.position);
+
+            renderer = new WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+
+            // --- Setup Background Shader Plane ---
+            backgroundMaterial = new ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    resolution: { value: new Vector2(width, height) },
+                    mouse: { value: new Vector2(0.5, 0.5) },
+                    psdNormalized: { value: 0.0 }
+                },
+                vertexShader: document.getElementById('backgroundVertexShader').textContent,
+                fragmentShader: document.getElementById('backgroundFragmentShader').textContent,
+                depthWrite: false,
+                depthTest: false
+            });
+            const backgroundGeometry = new PlaneGeometry(2, 2);
+            backgroundMesh = new Mesh(backgroundGeometry, backgroundMaterial);
+            backgroundMesh.renderOrder = -1;
+            scene.add(backgroundMesh);
+
+
+            // --- Post-Processing Bloom ---
+            const renderPass = new RenderPass(scene, camera);
+            bloomPass = new UnrealBloomPass(new Vector2(width, height), BLOOM_STRENGTH, 0.2, 0.1);
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderPass);
+            composer.addPass(bloomPass);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 10;
+            controls.maxDistance = 5000;
+
+            attractorMeshes = new Group();
+            scene.add(attractorMeshes);
+
+            lightTokenBeams = new Group();
+            scene.add(lightTokenBeams);
+            
+            trailGroup = new Group(); // NEW: Group for trails
+            scene.add(trailGroup);
+            initTrails(); // NEW: Initialize trails
+
+            // --- Add the A-LMI Core ---
+            const coreGeom = new IcosahedronGeometry(15, 0);
+            const coreMat = new MeshBasicMaterial({ color: 0xffffff, wireframe: true });
+            almiCore = new Mesh(coreGeom, coreMat);
+            almiCore.position.copy(almiCorePos);
+            scene.add(almiCore);
+
+            addAttractor(new Vector3(0, 0, 0), 1000, true);
+
+            addParticles(10000);
+        }
+        
+        // NEW: Function to initialize trail rendering objects
+        function initTrails() {
+            trailPositions = new Float32Array(MAX_TRAIL_SEGMENTS * 2 * 3); // Each segment needs 2 points (start, end) * 3 coords
+            trailColors = new Float32Array(MAX_TRAIL_SEGMENTS * 2 * 3);    // Each segment needs 2 colors * 3 components
+            
+            trailGeometry = new BufferGeometry();
+            trailGeometry.setAttribute('position', new BufferAttribute(trailPositions, 3));
+            trailGeometry.setAttribute('color', new BufferAttribute(trailColors, 3));
+            
+            trailMaterial = new LineBasicMaterial({ 
+                vertexColors: true, 
+                transparent: true, 
+                opacity: 0.5 // Start trails semi-transparent
+            });
+            
+            trailLines = new LineSegments(trailGeometry, trailMaterial);
+            trailGroup.add(trailLines);
+            trailGeometry.setDrawRange(0, 0); // Initially draw nothing
+        }
+
+        // === Add Attractor Function ===
+        function addAttractor(position, mass, isCentral = false) {
+            if(isCentral) {
+                 attractors.push({ pos: position, mass: mass, isCentral: true });
+                 return;
+            }
+
+            attractors.push({ pos: position, mass: mass, isCentral: false });
+
+            const geometry = new SphereGeometry(7, 32, 32);
+            const material = new MeshStandardMaterial({
+                color: 0xff00ff,
+                wireframe: true,
+                emissive: 0xff00ff,
+                emissiveIntensity: 1.0 // Initial intensity
+            });
+            const attractorMesh = new Mesh(geometry, material);
+            attractorMesh.position.copy(position);
+
+            attractorMeshes.add(attractorMesh);
+        }
+
+        // === Particle Setup ===
+        function setupParticles() {
+            if (points) {
+                scene.remove(points);
+                points.geometry.dispose();
+                points.material.dispose();
+            }
+
+            if (particleCount === 0) {
+                positions = new Float32Array(0);
+                velocities = new Float32Array(0);
+                speeds = new Float32Array(0);
+                internalStates = new Float32Array(0);
+                internalAmplitudes = new Float32Array(0);
+                prevPositions = new Float32Array(0); // NEW: Clear prev positions
+                return;
+            }
+
+            positions = new Float32Array(particleCount * 3);
+            velocities = new Float32Array(particleCount * 3);
+            speeds = new Float32Array(particleCount);
+            internalStates = new Float32Array(particleCount);
+            internalAmplitudes = new Float32Array(particleCount);
+            prevPositions = new Float32Array(particleCount * 3); // NEW: Initialize prev positions
+
+            for (let i = 0; i < particleCount; i++) {
+                const r = Math.random() * GALAXY_RADIUS * 0.5 + 100;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+
+                const px = Math.sin(phi) * Math.cos(theta) * r;
+                const py = Math.cos(phi) * r;
+                const pz = Math.sin(phi) * Math.sin(theta) * r;
+                
+                positions[i * 3] = px;
+                positions[i * 3 + 1] = py;
+                positions[i * 3 + 2] = pz;
+                
+                // NEW: Initialize prevPositions to current positions
+                prevPositions[i * 3] = px;
+                prevPositions[i * 3 + 1] = py;
+                prevPositions[i * 3 + 2] = pz;
+
+                velocities[i * 3] = (Math.random() - 0.5) * 2;
+                velocities[i * 3 + 1] = (Math.random() - 0.5) * 2;
+                velocities[i * 3 + 2] = (Math.random() - 0.5) * 2;
+
+                speeds[i] = Math.sqrt(velocities[i*3]**2 + velocities[i*3+1]**2 + velocities[i*3+2]**2);
+
+                internalStates[i] = Math.random();
+                internalAmplitudes[i] = 0.5 + Math.random() * 0.5;
+            }
+
+            const geometry = new BufferGeometry();
+            geometry.setAttribute('position', new BufferAttribute(positions, 3));
+            geometry.setAttribute('velocity', new BufferAttribute(velocities, 3));
+            geometry.setAttribute('speed', new BufferAttribute(speeds, 1));
+            geometry.setAttribute('internalState', new BufferAttribute(internalStates, 1));
+            geometry.setAttribute('internalAmplitude', new BufferAttribute(internalAmplitudes, 1));
+
+            const material = new ShaderMaterial({
+                uniforms: {},
+                vertexShader: document.getElementById('vertexShader').textContent,
+                fragmentShader: document.getElementById('fragmentShader').textContent,
+                blending: AdditiveBlending,
+                transparent: true,
+                depthWrite: false,
+                vertexColors: false
+            });
+
+            points = new Points(geometry, material);
+            scene.add(points);
+        }
+
+        // === Physics Update ===
+        // NEW: Added trail update logic
+        function updatePhysics(dt) {
+            if (particleCount === 0 || !points || !points.geometry) return;
+
+            const posAttr = points.geometry.getAttribute('position');
+            const velAttr = points.geometry.getAttribute('velocity');
+            const speedAttr = points.geometry.getAttribute('speed');
+            const internalStateAttr = points.geometry.getAttribute('internalState');
+            const internalAmpAttr = points.geometry.getAttribute('internalAmplitude');
+            
+            const trailPosAttr = trailGeometry.getAttribute('position');
+            const trailColorAttr = trailGeometry.getAttribute('color');
+            trailSegmentCount = 0; // Reset trail count each frame
+
+            const time = clock.elapsedTime;
+
+            for (let i = 0; i < particleCount; i++) {
+                 if (i >= internalStates.length || internalStates[i] === -1.0) continue;
+
+                prevParticlePos.fromArray(posAttr.array, i * 3); // Store previous position for trail
+
+                particlePos.fromArray(posAttr.array, i * 3);
+                particleVel.fromArray(velAttr.array, i * 3);
+
+                const pOmega = internalStateAttr.getX(i) * 20.0;
+                const pEc = internalAmpAttr.getX(i);
+
+                force.set(0, 0, 0);
+
+                const state_i = (pEc * HARMONIC_FLUTTER_STRENGTH * Math.sin(time * pOmega)) +
+                              (SIGMA_FINAL * 0.15 * Math.cos(time * pOmega));
+                f_flutter.set(0, state_i, 0);
+                force.add(f_flutter);
+
+                for (const a of attractors) {
+                    f_harmonic.subVectors(particlePos, a.pos);
+
+                    const r_sq = f_harmonic.lengthSq();
+                    const r_sq_eps = r_sq + SOFTENING;
+                    const r = Math.sqrt(r_sq_eps);
+                    const r_cubed = r_sq_eps * r;
+
+                    const f_grav_mag = -(G_CONST * a.mass * PARTICLE_MASS) / r_cubed;
+                    f_grav.copy(f_harmonic).multiplyScalar(f_grav_mag);
+
+                    f_harmonic.multiplyScalar(-K_HARMONIC);
+
+                    f_swirl.crossVectors(f_harmonic, SWIRL_AXIS).multiplyScalar(SWIRL_CONST * (a.mass / 1000));
+
+                    force.add(f_harmonic).add(f_grav).add(f_swirl);
+                }
+
+                f_damp.copy(particleVel).multiplyScalar(-DAMPING);
+                force.add(f_damp);
+
+                f_noise.set(
+                    (Math.random() - 0.5),
+                    (Math.random() - 0.5),
+                    (Math.random() - 0.5)
+                ).multiplyScalar(SIGMA_FINAL * 0.5);
+                force.add(f_noise);
+
+                accel.copy(force).divideScalar(PARTICLE_MASS);
+                particleVel.add(accel.multiplyScalar(dt));
+                particlePos.add(particleVel.multiplyScalar(dt));
+
+                const currentSpeed = particleVel.length();
+                speedAttr.setX(i, currentSpeed);
+
+                // --- Add Trail Segment ---
+                if (trailSegmentCount < MAX_TRAIL_SEGMENTS) {
+                     const trailIndex = trailSegmentCount * 2 * 3; // 2 points per segment, 3 coords each
+                     
+                     // Start point (previous position)
+                     trailPosAttr.setXYZ(trailIndex / 3, prevParticlePos.x, prevParticlePos.y, prevParticlePos.z);
+                     // End point (current position)
+                     trailPosAttr.setXYZ(trailIndex / 3 + 1, particlePos.x, particlePos.y, particlePos.z);
+                     
+                     // Calculate trail color based on speed (similar to particle color)
+                     const hue = 0.66 + internalStateAttr.getX(i) * 0.17;
+                     let r = 0, g = 0, b = 0;
+                     const c = 1.0;
+                     const x = c * (1.0 - Math.abs((hue * 6.0) % 2.0 - 1.0));
+                     if (hue < 0.166) { r=c; g=x; } else if (hue < 0.333) { g=c; r=x; }
+                     else if (hue < 0.5) { g=c; b=x; } else if (hue < 0.666) { b=c; g=x; }
+                     else if (hue < 0.833) { b=c; r=x; } else { r=c; b=x; }
+                     
+                     const intensity = THREE.MathUtils.smoothstep(currentSpeed, 10.0, 40.0);
+                     const hotR = 1.0, hotG = 1.0, hotB = 0.9;
+                     
+                     const finalR = THREE.MathUtils.lerp(r, hotR, intensity);
+                     const finalG = THREE.MathUtils.lerp(g, hotG, intensity);
+                     const finalB = THREE.MathUtils.lerp(b, hotB, intensity);
+
+                     trailColorAttr.setXYZ(trailIndex / 3, finalR, finalG, finalB); // Start color
+                     trailColorAttr.setXYZ(trailIndex / 3 + 1, finalR, finalG, finalB); // End color (same for now)
+                     
+                     trailSegmentCount++;
+                }
+
+
+                // Update position buffers AFTER adding trail segment
+                posAttr.setXYZ(i, particlePos.x, particlePos.y, particlePos.z);
+                velAttr.setXYZ(i, particleVel.x, particleVel.y, particleVel.z);
+                
+                // --- Recycling ---
+                if (particlePos.lengthSq() > GALAXY_RADIUS * GALAXY_RADIUS) {
+                   const y = 1 - (i / (particleCount - 1)) * 2;
+                   const radius = Math.sqrt(1 - y * y);
+                   const theta = GOLDEN_ANGLE * i;
+                   const spawnRadius = 20.0;
+
+                   particlePos.set(
+                       Math.cos(theta) * radius * spawnRadius,
+                       y * spawnRadius,
+                       Math.sin(theta) * radius * spawnRadius
+                   );
+
+                   particleVel.set(
+                       (Math.random() - 0.5) * 0.1,
+                       (Math.random() - 0.5) * 0.1,
+                       (Math.random() - 0.5) * 0.1
+                   );
+                   speedAttr.setX(i, 0.1);
+                   
+                   // Update buffers immediately after recycling
+                   posAttr.setXYZ(i, particlePos.x, particlePos.y, particlePos.z);
+                   velAttr.setXYZ(i, particleVel.x, particleVel.y, particleVel.z);
+                }
+            }
+
+            posAttr.needsUpdate = true;
+            velAttr.needsUpdate = true;
+            speedAttr.needsUpdate = true;
+            
+            // NEW: Update trail geometry
+            trailPosAttr.needsUpdate = true;
+            trailColorAttr.needsUpdate = true;
+            trailGeometry.setDrawRange(0, trailSegmentCount * 2); // Update how many segments to draw
+            
+             // Fade trail opacity
+            trailMaterial.opacity = Math.max(0, trailMaterial.opacity - TRAIL_FADE_SPEED * dt * 0.1); // Slow fade based on dt
+             if (trailMaterial.opacity <= 0.01) {
+                 trailMaterial.opacity = 0.5; // Reset opacity when faded
+            }
+
+        }
+
+
+        // === Control Panel and UI ===
+        const toggleMicButton = document.getElementById('toggleMicButton');
+        const micStatus = document.getElementById('micStatus');
+        const addParticlesButton = document.getElementById('addParticlesButton');
+        const clearParticlesButton = document.getElementById('clearParticlesButton');
+        const addAttractorButton = document.getElementById('addAttractorButton');
+        const clearAllButton = document.getElementById('clearAllButton');
+
+        const swirlSlider = document.getElementById('swirlSlider');
+        const gravitySlider = document.getElementById('gravitySlider');
+        const dampingSlider = document.getElementById('dampingSlider');
+        const lambdaSlider = document.getElementById('lambdaSlider');
+        const bloomSlider = document.getElementById('bloomSlider');
+
+        const swirlValue = document.getElementById('swirlValue');
+        const gravityValue = document.getElementById('gravityValue');
+        const dampingValue = document.getElementById('dampingValue');
+        const lambdaValue = document.getElementById('lambdaValue');
+        const bloomValue = document.getElementById('bloomValue');
+
+        const uiParticleCount = document.getElementById('particleCount');
+        const uiAttractorCount = document.getElementById('attractorCount');
+        const psdValue = document.getElementById('psdValue');
+        const sigmaValue = document.getElementById('sigmaValue');
+        const almiActionDisplay = document.getElementById('almiActionDisplay'); // NEW
+
+        // Menu Toggle Elements
+        const menuPanel = document.getElementById('menuPanel');
+        const menuToggleButton = document.getElementById('menuToggleButton');
+        const menuContent = document.getElementById('menuContent');
+        const minimizeIcon = document.getElementById('minimizeIcon');
+        const maximizeIcon = document.getElementById('maximizeIcon');
+        let isMenuMinimized = false;
+
+        // A-LMI UI Elements
+        const freqBars = [
+            document.getElementById('freqBar_0'),
+            document.getElementById('freqBar_1'),
+            document.getElementById('freqBar_2'),
+            document.getElementById('freqBar_3')
+        ];
+        const freqCounts = [
+            document.getElementById('freqCount_0'),
+            document.getElementById('freqCount_1'),
+            document.getElementById('freqCount_2'),
+            document.getElementById('freqCount_3')
+        ];
+        const totalTokenCount = document.getElementById('totalTokenCount');
+
+        // Event Listeners for Controls
+        toggleMicButton.addEventListener('click', initAudio);
+
+        addParticlesButton.addEventListener('click', () => {
+            addParticles(10000);
+        });
+        clearParticlesButton.addEventListener('click', () => {
+            particleCount = 0;
+            setupParticles();
+             trailSegmentCount = 0; // NEW: Reset trails
+             trailGeometry.setDrawRange(0, 0); // NEW: Update draw range
+        });
+
+        addAttractorButton.addEventListener('click', () => {
+            const pos = new Vector3(
+                (Math.random() - 0.5) * GALAXY_RADIUS,
+                (Math.random() - 0.5) * (GALAXY_RADIUS * 0.2),
+                (Math.random() - 0.5) * GALAXY_RADIUS
+            );
+            const mass = Math.random() * 2000 + 500;
+            addAttractor(pos, mass, false);
+        });
+
+        clearAllButton.addEventListener('click', () => {
+            particleCount = 0;
+            setupParticles();
+
+            attractors = attractors.filter(a => a.isCentral);
+            for (let i = attractorMeshes.children.length - 1; i >= 0; i--) {
+                 const mesh = attractorMeshes.children[i];
+                 mesh.geometry.dispose();
+                 mesh.material.dispose();
+                 attractorMeshes.remove(mesh);
+            }
+
+            trailSegmentCount = 0; // NEW: Reset trails
+            trailGeometry.setDrawRange(0, 0); // NEW: Update draw range
+
+            almiMemory = [0, 0, 0, 0];
+            almiTotalTokens = 0;
+            updateAlmiMemoryUI();
+            almiActionDisplay.textContent = "A-LMI Action: Idle"; // NEW: Reset action display
+        });
+
+        menuToggleButton.addEventListener('click', () => {
+            isMenuMinimized = !isMenuMinimized;
+            menuContent.classList.toggle('hidden');
+            minimizeIcon.classList.toggle('hidden');
+            maximizeIcon.classList.toggle('hidden');
+
+            if (isMenuMinimized) {
+                menuPanel.classList.remove('max-w-sm');
+                menuPanel.classList.add('w-auto');
+            } else {
+                menuPanel.classList.add('max-w-sm');
+                menuPanel.classList.remove('w-auto');
+            }
+        });
+
+        swirlSlider.addEventListener('input', (e) => {
+            SWIRL_CONST = parseFloat(e.target.value);
+            swirlValue.textContent = SWIRL_CONST.toFixed(2);
+        });
+        gravitySlider.addEventListener('input', (e) => {
+            G_CONST = parseFloat(e.target.value);
+            gravityValue.textContent = G_CONST.toFixed(0);
+        });
+        dampingSlider.addEventListener('input', (e) => {
+            DAMPING = parseFloat(e.target.value);
+            dampingValue.textContent = DAMPING.toFixed(3);
+        });
+        lambdaSlider.addEventListener('input', (e) => {
+            LAMBDA_CONST = parseFloat(e.target.value);
+            lambdaValue.textContent = LAMBDA_CONST.toFixed(1);
+        });
+        bloomSlider.addEventListener('input', (e) => {
+            BLOOM_STRENGTH = parseFloat(e.target.value);
+            bloomValue.textContent = BLOOM_STRENGTH.toFixed(2);
+            if (bloomPass) {
+                bloomPass.strength = BLOOM_STRENGTH;
+            }
+        });
+
+
+        // === Helper Functions ===
+        function addParticles(count, spawnConfig = null) {
+            const oldParticleCount = particleCount;
+            particleCount += count;
+
+            // Expand buffers (simple concatenation - more efficient ways exist for huge counts)
+            const newPositions = new Float32Array(particleCount * 3);
+            const newVelocities = new Float32Array(particleCount * 3);
+            const newSpeeds = new Float32Array(particleCount);
+            const newInternalStates = new Float32Array(particleCount);
+            const newInternalAmplitudes = new Float32Array(particleCount);
+            const newPrevPositions = new Float32Array(particleCount * 3); // NEW
+
+            if (positions) newPositions.set(positions);
+            if (velocities) newVelocities.set(velocities);
+            if (speeds) newSpeeds.set(speeds);
+            if (internalStates) newInternalStates.set(internalStates);
+            if (internalAmplitudes) newInternalAmplitudes.set(internalAmplitudes);
+            if (prevPositions) newPrevPositions.set(prevPositions); // NEW
+
+            positions = newPositions;
+            velocities = newVelocities;
+            speeds = newSpeeds;
+            internalStates = newInternalStates;
+            internalAmplitudes = newInternalAmplitudes;
+            prevPositions = newPrevPositions; // NEW
+
+
+            for (let i = oldParticleCount; i < particleCount; i++) {
+                let stateValue, amplitudeValue;
+                let px, py, pz; // Declare position variables
+
+                if (spawnConfig) {
+                    stateValue = spawnConfig.internalState;
+                    amplitudeValue = spawnConfig.internalAmplitude;
+                    const theta = Math.random() * Math.PI * 2;
+                    
+                    px = Math.cos(theta) * spawnConfig.radius;
+                    py = 0; // Spawn on the XZ plane
+                    pz = Math.sin(theta) * spawnConfig.radius;
+
+                    velocities[i * 3] = (Math.random() - 0.5) * 2;
+                    velocities[i * 3 + 1] = (Math.random() - 0.5) * 5;
+                    velocities[i * 3 + 2] = (Math.random() - 0.5) * 2;
+
+                } else {
+                    stateValue = Math.random();
+                    amplitudeValue = 0.5 + Math.random() * 0.5;
+                    const r = Math.random() * GALAXY_RADIUS * 0.5 + 100;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+
+                    px = Math.sin(phi) * Math.cos(theta) * r;
+                    py = Math.cos(phi) * r;
+                    pz = Math.sin(phi) * Math.sin(theta) * r;
+
+
+                    velocities[i * 3] = (Math.random() - 0.5) * 2;
+                    velocities[i * 3 + 1] = (Math.random() - 0.5) * 2;
+                    velocities[i * 3 + 2] = (Math.random() - 0.5) * 2;
+                }
+
+                positions[i * 3] = px;
+                positions[i * 3 + 1] = py;
+                positions[i * 3 + 2] = pz;
+                
+                // NEW: Initialize prev pos
+                prevPositions[i * 3] = px;
+                prevPositions[i * 3 + 1] = py;
+                prevPositions[i * 3 + 2] = pz;
+
+                internalStates[i] = stateValue;
+                internalAmplitudes[i] = amplitudeValue;
+                speeds[i] = Math.sqrt(velocities[i*3]**2 + velocities[i*3+1]**2 + velocities[i*3+2]**2);
+            }
+
+            setupParticlesGeometryAndMaterial();
+        }
+
+
+        function setupParticlesGeometryAndMaterial() {
+             if (points) {
+                scene.remove(points);
+                points.geometry.dispose();
+                points.material.dispose();
+            }
+             if (particleCount === 0) return;
+
+            const geometry = new BufferGeometry();
+            geometry.setAttribute('position', new BufferAttribute(positions, 3));
+            geometry.setAttribute('velocity', new BufferAttribute(velocities, 3));
+            geometry.setAttribute('speed', new BufferAttribute(speeds, 1));
+            geometry.setAttribute('internalState', new BufferAttribute(internalStates, 1));
+            geometry.setAttribute('internalAmplitude', new BufferAttribute(internalAmplitudes, 1));
+
+            const material = new ShaderMaterial({
+                uniforms: {},
+                vertexShader: document.getElementById('vertexShader').textContent,
+                fragmentShader: document.getElementById('fragmentShader').textContent,
+                blending: AdditiveBlending,
+                transparent: true,
+                depthWrite: false,
+                vertexColors: false
+            });
+
+            points = new Points(geometry, material);
+            scene.add(points);
+        }
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            if (camera) {
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+            }
+            if (renderer) {
+                 renderer.setSize(width, height);
+            }
+            if (composer) {
+                 composer.setSize(width, height);
+            }
+            if (backgroundMaterial) {
+                backgroundMaterial.uniforms.resolution.value.set(width, height);
+            }
+        });
+
+        window.addEventListener('mousemove', (event) => {
+             if (backgroundMaterial) {
+                 backgroundMaterial.uniforms.mouse.value.x = event.clientX / window.innerWidth;
+                 backgroundMaterial.uniforms.mouse.value.y = 1.0 - (event.clientY / window.innerHeight);
+             }
+        });
+
+        // === Audio Logic ===
+        function initAudio() {
+            if (micOn) {
+                if (audioContext) audioContext.close();
+                audioContext = null;
+                micOn = false;
+                analyser = null;
+                fftDataArray = null;
+                micStatus.textContent = "Mic OFF. Using Baseline Chaos.";
+                toggleMicButton.classList.remove('bg-red-600', 'hover:bg-red-500');
+                toggleMicButton.classList.add('bg-cyan-500', 'hover:bg-cyan-400');
+                psdNormalized = 0;
+            } else {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        micOn = true;
+                        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        analyser = audioContext.createAnalyser();
+                        const source = audioContext.createMediaStreamSource(stream);
+                        source.connect(analyser);
+
+                        analyser.fftSize = 256;
+                        analyser.smoothingTimeConstant = 0.3;
+
+                        fftDataArray = new Float32Array(analyser.frequencyBinCount);
+
+                        micStatus.textContent = "Mic ON. Your voice is CREATING the universe.";
+                        toggleMicButton.classList.add('bg-red-600', 'hover:bg-red-500');
+                        toggleMicButton.classList.remove('bg-cyan-500', 'hover:bg-cyan-400');
+                    })
+                    .catch(err => {
+                        console.error('Microphone access denied:', err);
+                        micStatus.textContent = "Mic access denied. Using Baseline Chaos.";
+                        micOn = false;
+                    });
+            }
+        }
+
+        function updateVibraLight() {
+            if (micOn && analyser) {
+                const bufferLength = analyser.frequencyBinCount;
+                 if (!fftDataArray || fftDataArray.length !== bufferLength) {
+                     fftDataArray = new Float32Array(bufferLength); // Reinitialize if needed
+                 }
+                analyser.getFloatFrequencyData(fftDataArray);
+
+                let sum = 0;
+                let maxVal = -Infinity;
+                let maxIndex = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const db = fftDataArray[i];
+                    if (db > maxVal && isFinite(db)) { // Added finiteness check
+                        maxVal = db;
+                        maxIndex = i;
+                    }
+                    const normalized_db = (db + 100) / 100; // Assuming min dB is -100
+                    // Clamp normalized_db to avoid issues with -Infinity
+                     const clamped_db = Math.max(0, normalized_db); 
+                    sum += clamped_db * clamped_db;
+                }
+                const avgPower = bufferLength > 0 ? sum / bufferLength : 0; // Avoid division by zero
+
+
+                psdNormalized = Math.min(Math.max(0, avgPower * 5), 1.0); // Ensure value is between 0 and 1
+                SIGMA_FINAL = SIGMA_PSD * psdNormalized;
+
+                psdValue.textContent = psdNormalized.toFixed(2);
+
+                const baseSpawnCount = Math.floor(psdNormalized * CYMATIC_SPAWN_COUNT);
+
+                if (baseSpawnCount > 0) {
+                    const dominantFrequencyNorm = bufferLength > 1 ? maxIndex / (bufferLength - 1) : 0; // Avoid division by zero
+                    const creationRadius = CYMATIC_RADIUS_MIN + dominantFrequencyNorm * (CYMATIC_RADIUS_MAX - CYMATIC_RADIUS_MIN);
+
+                    const spawnCountPerRing = Math.max(1, Math.floor(baseSpawnCount / 4));
+                    const spawnConfig = {
+                        internalState: dominantFrequencyNorm,
+                        internalAmplitude: psdNormalized
+                    };
+
+                    addParticles(spawnCountPerRing, { ...spawnConfig, radius: creationRadius });
+                    addParticles(spawnCountPerRing, { ...spawnConfig, radius: creationRadius / 2 });
+                    addParticles(spawnCountPerRing, { ...spawnConfig, radius: creationRadius / PHI });
+                    addParticles(spawnCountPerRing, { ...spawnConfig, radius: creationRadius * PHI });
+                }
+
+            } else {
+                SIGMA_FINAL = SIGMA_LAMBDA * LAMBDA_CONST;
+                psdNormalized = 0; // Ensure psdNormalized is 0 when mic is off
+                psdValue.textContent = "N/A";
+            }
+            sigmaValue.textContent = SIGMA_FINAL.toFixed(2);
+
+             // Update background shader sound uniform
+            if (backgroundMaterial) {
+                backgroundMaterial.uniforms.psdNormalized.value = psdNormalized;
+            }
+
+        }
+
+        // --- A-LMI Logic ---
+        function updateAlmi(dt) {
+            almiScanTimer += dt;
+            almiActionTimer += dt; // NEW: Increment action timer
+
+            if (almiCore) {
+                 almiCore.rotation.x += 0.001 * dt;
+                 almiCore.rotation.y += 0.003 * dt;
+            }
+
+            for (let i = lightTokenBeams.children.length - 1; i >= 0; i--) {
+                const beam = lightTokenBeams.children[i];
+                beam.material.opacity -= 0.04 * dt;
+                if (beam.material.opacity <= 0) {
+                    beam.geometry.dispose();
+                    beam.material.dispose();
+                    lightTokenBeams.remove(beam);
+                }
+            }
+
+            // "Scientist Within" autonomous scan
+            if (almiScanTimer > ALMI_SCAN_INTERVAL && particleCount > 0 && positions && positions.length > 0) {
+                almiScanTimer = 0;
+
+                const scanIndex = Math.floor(Math.random() * particleCount);
+                if (scanIndex * 3 + 2 >= positions.length || scanIndex >= internalStates.length) return; // Combined boundary check
+
+
+                particlePos.fromArray(positions, scanIndex * 3);
+
+                if (particlePos.lengthSq() < ALMI_SCAN_RADIUS * ALMI_SCAN_RADIUS) {
+                    const internalState = internalStates[scanIndex];
+                    if (internalState >= 0.0) {
+                        processLightToken(particlePos, internalState, scanIndex);
+                    }
+                }
+            }
+            
+            // NEW: A-LMI Autonomous Action
+            if (almiActionTimer > ALMI_ACTION_INTERVAL) {
+                 almiActionTimer = 0; // Reset timer
+                 performAlmiAction();
+            }
+        }
+        
+         // NEW: Function for A-LMI to analyze memory and act
+        function performAlmiAction() {
+            if (almiTotalTokens === 0) {
+                almiActionDisplay.textContent = "A-LMI Action: Observing...";
+                return; // Not enough data to act
+            }
+
+            // Simple analysis: Compare low vs high frequency tokens
+            const lowFreqCount = almiMemory[0] + almiMemory[1];
+            const highFreqCount = almiMemory[2] + almiMemory[3];
+
+            const SWIRL_ADJUST_RATE = 0.01;
+            const MAX_SWIRL = 0.8;
+            const MIN_SWIRL = 0.1;
+
+            if (lowFreqCount > highFreqCount * 1.2) { // If low frequencies dominate significantly
+                // Increase swirl to encourage mixing
+                SWIRL_CONST = Math.min(MAX_SWIRL, SWIRL_CONST + SWIRL_ADJUST_RATE);
+                almiActionDisplay.textContent = `A-LMI Action: Low freq dominant. Increasing Swirl to ${SWIRL_CONST.toFixed(2)}.`;
+            } else if (highFreqCount > lowFreqCount * 1.2) { // If high frequencies dominate significantly
+                // Decrease swirl
+                SWIRL_CONST = Math.max(MIN_SWIRL, SWIRL_CONST - SWIRL_ADJUST_RATE);
+                 almiActionDisplay.textContent = `A-LMI Action: High freq dominant. Decreasing Swirl to ${SWIRL_CONST.toFixed(2)}.`;
+            } else {
+                 almiActionDisplay.textContent = "A-LMI Action: Frequencies balanced. Holding Swirl.";
+            }
+
+            // Update the UI slider and value display
+            swirlSlider.value = SWIRL_CONST;
+            swirlValue.textContent = SWIRL_CONST.toFixed(2);
+        }
+
+
+        function processLightToken(particlePos, internalState, particleIndex) {
+             if (!particlePos || typeof internalState === 'undefined' || particleIndex >= particleCount) return;
+
+            const beamMat = new LineBasicMaterial({
+                color: 0xffffff,
+                linewidth: 1,
+                transparent: true,
+                opacity: 1.0
+            });
+            const beamGeom = new BufferGeometry().setFromPoints([particlePos, almiCorePos]);
+            const beam = new Line(beamGeom, beamMat);
+            lightTokenBeams.add(beam);
+
+            const freqBand = Math.min(3, Math.floor(internalState * 4));
+            almiMemory[freqBand]++;
+            almiTotalTokens++;
+
+            updateAlmiMemoryUI();
+
+             if (particleIndex < particleCount && particleIndex < internalStates.length) {
+                 internalStates[particleIndex] = -1.0;
+                 resetParticle(particleIndex);
+            }
+        }
+
+        function updateAlmiMemoryUI() {
+            totalTokenCount.textContent = almiTotalTokens.toLocaleString();
+            let maxTokensInBand = 1;
+            for(let i=0; i<4; i++) {
+                if (almiMemory[i] > maxTokensInBand) maxTokensInBand = almiMemory[i];
+            }
+
+            for(let i=0; i<4; i++) {
+                freqCounts[i].textContent = almiMemory[i];
+                const percent = maxTokensInBand > 0 ? (almiMemory[i] / maxTokensInBand) * 100 : 0;
+                freqBars[i].style.width = `${percent}%`;
+            }
+        }
+
+         function resetParticle(i) {
+             if (i >= particleCount ||
+                 !positions || i * 3 + 2 >= positions.length || // Check arrays exist
+                 !velocities || i * 3 + 2 >= velocities.length ||
+                 !speeds || i >= speeds.length ||
+                 !internalStates || i >= internalStates.length ||
+                 !internalAmplitudes || i >= internalAmplitudes.length) return;
+
+
+            const y = 1 - (i / (particleCount - 1)) * 2;
+            const radius = Math.sqrt(1 - y * y);
+            const theta = GOLDEN_ANGLE * i;
+            const spawnRadius = 20.0;
+
+            particlePos.set(
+                Math.cos(theta) * radius * spawnRadius,
+                y * spawnRadius,
+                Math.sin(theta) * radius * spawnRadius
+            );
+
+            particleVel.set(
+                (Math.random() - 0.5) * 0.1,
+                (Math.random() - 0.5) * 0.1,
+                (Math.random() - 0.5) * 0.1
+            );
+
+            positions[i*3] = particlePos.x;
+            positions[i*3+1] = particlePos.y;
+            positions[i*3+2] = particlePos.z;
+
+            velocities[i*3] = particleVel.x;
+            velocities[i*3+1] = particleVel.y;
+            velocities[i*3+2] = particleVel.z;
+
+            speeds[i] = 0.1;
+
+            internalStates[i] = Math.random();
+            internalAmplitudes[i] = 0.5 + Math.random() * 0.5;
+
+             if (points && points.geometry) {
+                 const posAttr = points.geometry.getAttribute('position');
+                 const velAttr = points.geometry.getAttribute('velocity');
+                 const speedAttr = points.geometry.getAttribute('speed');
+                 const internalStateAttr = points.geometry.getAttribute('internalState');
+                 const internalAmpAttr = points.geometry.getAttribute('internalAmplitude');
+
+                 // Check if attributes exist before setting needsUpdate
+                 if (posAttr) posAttr.needsUpdate = true;
+                 if (velAttr) velAttr.needsUpdate = true;
+                 if (speedAttr) speedAttr.needsUpdate = true;
+                 if (internalStateAttr) internalStateAttr.needsUpdate = true;
+                 if (internalAmpAttr) internalAmpAttr.needsUpdate = true;
+            }
+        }
+
+
+        // === Main Animation Loop ===
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const dt = clock.getDelta() * 10;
+
+            if(backgroundMaterial) {
+                backgroundMaterial.uniforms.time.value += 0.02;
+            }
+
+            updateVibraLight();
+            updateAlmi(dt);
+
+            if(particleCount > 0 && points) {
+                updatePhysics(dt);
+            }
+
+            controls.update();
+            composer.render();
+
+            const centralAttractor = attractors.find(a => a.isCentral);
+            if (centralAttractor && almiCore) {
+                const hue = 0.7 - (psdNormalized * 0.7);
+                micColor.setHSL(hue, 1.0, 0.7);
+                almiCore.material.color = micColor;
+                almiCore.scale.setScalar(1.0 + psdNormalized * 0.5);
+            }
+
+            // Update non-central attractor meshes based on sound
+            attractorMeshes.children.forEach(mesh => {
+                 const attractorData = attractors.find(a => !a.isCentral && mesh.position.equals(a.pos)); // Find non-central
+                 if (attractorData && mesh.material.emissiveIntensity !== undefined) { // Check if material exists and has property
+                     mesh.material.emissiveIntensity = 1.0 + psdNormalized * 2.0; // Pulse intensity
+                     mesh.scale.setScalar(1.0 + psdNormalized * 0.1); // Pulse scale slightly
+                 }
+            });
+
+
+            uiParticleCount.textContent = particleCount.toLocaleString();
+            uiAttractorCount.textContent = attractors.length;
+        }
+
+        // === Initialization ===
+        function init() {
+            init3D();
+
+            swirlValue.textContent = SWIRL_CONST.toFixed(2);
+            gravityValue.textContent = G_CONST.toFixed(0);
+            dampingValue.textContent = DAMPING.toFixed(3);
+            lambdaValue.textContent = LAMBDA_CONST.toFixed(1);
+            bloomValue.textContent = BLOOM_STRENGTH.toFixed(2);
+
+            animate();
+        }
+
+        init(); // Call init to start everything
+    </script>
+</body>
+</html>
+

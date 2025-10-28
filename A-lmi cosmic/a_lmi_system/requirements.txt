@@ -1,0 +1,72 @@
+# Davis Unified Intelligence System Requirements
+# A-LMI v2.0
+
+# Event Bus
+kafka-python==2.0.2
+
+# Web Crawling
+scrapy==2.11.0
+selenium==4.15.0
+playwright==1.40.0
+beautifulsoup4==4.12.2
+
+# Audio Processing
+vosk==0.3.45
+sounddevice==0.4.6
+librosa==0.10.1
+pyaudio==0.2.14
+
+# Machine Learning & AI
+torch==2.1.0
+torchvision==0.16.0
+torchaudio==2.1.0
+transformers==4.35.0
+openai==1.3.0
+clip-by-openai==1.0
+
+# Vector Database
+pymilvus==2.3.4
+
+# Graph Database
+neo4j==5.14.0
+
+# Object Storage
+minio==7.2.0
+
+# Image/Perceptual Hashing
+imagehash==4.3.1
+pillow==10.1.0
+
+# Numerical Computing
+numpy==1.24.3
+scipy==1.11.4
+
+# Security & Privacy
+cryptography==41.0.7
+hvac==2.1.0  # HashiCorp Vault
+pyfhe==0.1.0  # Homomorphic Encryption
+
+# UI & Visualization
+gradio==4.7.0
+streamlit==1.28.0
+plotly==5.17.0
+viser==0.2.0
+
+# IPC
+pyzmq==25.1.1
+
+# Utilities
+pyyaml==6.0.1
+python-dotenv==1.0.0
+tqdm==4.66.1
+loguru==0.7.2
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+
+# Development
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.0
+
